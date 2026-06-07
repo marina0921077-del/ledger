@@ -828,7 +828,7 @@ function handleURLImport(){
     const params=new URLSearchParams(window.location.search);
     const raw=params.get("add");
     if(!raw)return;
-    const json=atob(raw.replace(/-/g,"+").replace(/_/g,"/"));
+    const json=decodeURIComponent(raw);
     const items=JSON.parse(json);
     if(!items||!items.length)return;
 
@@ -836,6 +836,18 @@ function handleURLImport(){
     const url=new URL(window.location.href);
     url.searchParams.delete("add");
     window.history.replaceState({},"",url.toString());
+
+    // Auto-navigate to the week containing the first item's date
+    if(items[0]&&items[0].date){
+      const[m,dd]=items[0].date.split("/").map(Number);
+      const weeks=getMonthWeeks(curYear,curMonth);
+      for(let wi=0;wi<weeks.length;wi++){
+        if(weeks[wi].dates.some(d=>d.getMonth()+1===m&&d.getDate()===dd)){
+          weekOffset=wi; break;
+        }
+      }
+      renderDaily();
+    }
 
     // Show confirmation sheet
     const weeks=getMonthWeeks(curYear,curMonth);
