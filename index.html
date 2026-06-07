@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="家庭帳本">
+<title>家庭帳本</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{background:#0f0f13;color:#e8e4dc;font-family:'PingFang TC','Noto Sans TC',sans-serif;font-size:15px;display:flex;flex-direction:column}
+
+/* Safe areas for iPhone notch/home bar */
+#app{display:flex;flex-direction:column;height:100%;padding-top:env(safe-area-inset-top)}
+
+/* Header */
+#header{background:#1a1a24;border-bottom:1px solid #2a2a3a;padding:14px 18px 12px;flex-shrink:0}
+#header-row{display:flex;align-items:center;justify-content:space-between}
+#logo{font-size:19px;font-weight:800;letter-spacing:2px;color:#c8b97a}
+.hdr-right{display:flex;gap:8px;align-items:center}
+.hdr-btn{background:#1e1e2a;border:1px solid #2a2a3a;color:#aaa;border-radius:8px;padding:6px 12px;font-size:12px;font-family:inherit}
+#week-label{font-size:11px;color:#555;margin-top:4px}
+
+/* Scroll content */
+#content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px 6px}
+
+/* Bottom nav */
+#nav{display:flex;background:#1a1a24;border-top:1px solid #2a2a3a;padding-bottom:env(safe-area-inset-bottom);flex-shrink:0}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 4px 8px;background:none;border:none;color:#555;font-family:inherit;font-size:10px;gap:3px;cursor:pointer;transition:color .15s}
+.nav-btn .icon{font-size:20px;line-height:1}
+.nav-btn.active{color:#c8b97a}
+
+/* Pages */
+.page{display:none}.page.active{display:block}
+
+/* Summary cards */
+.sc-row{display:flex;gap:10px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px}
+.sc-row::-webkit-scrollbar{display:none}
+.sc{background:#1a1a24;border:1px solid #2a2a3a;border-radius:12px;padding:12px 16px;flex-shrink:0;min-width:120px}
+.sc.gold{background:#c8b97a10;border-color:#c8b97a33}
+.sc-label{font-size:10px;color:#555;margin-bottom:3px}
+.sc-val{font-size:19px;font-weight:800;color:#c8b97a}
+.sc-val-sm{font-size:14px;font-weight:700}
+
+/* Quick entry card */
+.qcard{background:#1a1a24;border:1px solid #2a2a3a;border-radius:14px;padding:16px;margin-bottom:14px}
+.qcard-title{font-size:12px;font-weight:700;color:#c8b97a;margin-bottom:12px;letter-spacing:.5px}
+.qrow{display:flex;gap:8px;margin-bottom:10px;align-items:stretch}
+.qrow:last-of-type{margin-bottom:0}
+.qlabel{font-size:11px;color:#555;margin-bottom:4px}
+.qfield{display:flex;flex-direction:column;flex:1}
+input,select{background:#0a0a10;border:1px solid #252535;border-radius:10px;color:#e8e4dc;padding:11px 12px;font-family:inherit;font-size:15px;outline:none;width:100%;-webkit-appearance:none;appearance:none}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:28px}
+.btn-add{background:#c8b97a;color:#0f0f13;border:none;border-radius:12px;padding:13px;font-weight:800;font-size:16px;font-family:inherit;width:100%;margin-top:10px;letter-spacing:.5px}
+.btn-add:active{opacity:.8}
+.btn-sec{background:#1e1e2a;color:#c8b97a;border:1px solid #c8b97a22;border-radius:10px;padding:11px;font-size:14px;font-family:inherit;width:100%;margin-top:8px}
+
+/* Day cards */
+.day-card{background:#1a1a24;border:1px solid #2a2a3a;border-radius:14px;margin-bottom:10px;overflow:hidden}
+.day-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#161620}
+.day-label{font-size:13px;font-weight:700}
+.day-label.today{color:#c8b97a}
+.day-total{font-size:16px;font-weight:800;color:#c8b97a}
+.day-total.zero{color:#333}
+.entries-list{padding:8px 12px 10px}
+.entry-row{display:flex;align-items:center;padding:9px 4px;border-bottom:1px solid #1e1e1e}
+.entry-row:last-child{border-bottom:none}
+.entry-cat{background:#c8b97a18;color:#c8b97a;font-size:10px;padding:2px 6px;border-radius:5px;margin-right:8px;white-space:nowrap}
+.entry-desc{flex:1;font-size:14px}
+.entry-method{font-size:10px;color:#555;margin-left:6px}
+.entry-amt{font-size:15px;font-weight:700;color:#e8e4dc;margin-left:8px}
+.entry-del{background:none;border:none;color:#3a3a3a;font-size:18px;padding:0 0 0 10px;line-height:1}
+.no-entries{padding:12px 16px;color:#333;font-size:13px}
+
+/* Week method summary */
+.method-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.method-chip{background:#1a1a24;border:1px solid #2a2a3a;border-radius:8px;padding:6px 12px;font-size:12px}
+.method-chip span{color:#c8b97a;font-weight:700;margin-left:4px}
+
+/* Budget list */
+.bcat-row{display:flex;align-items:center;background:#1a1a24;border:1px solid #2a2a3a;border-radius:12px;padding:12px 14px;margin-bottom:8px;gap:10px}
+.bcat-name{font-size:14px;font-weight:600;min-width:72px}
+.bcat-inputs{display:flex;flex-direction:column;gap:6px;flex:1}
+.bcat-input-row{display:flex;gap:6px}
+.bcat-input-row label{font-size:10px;color:#555;margin-bottom:2px}
+.bcat-input-wrap{display:flex;flex-direction:column;flex:1}
+.bcat-input-wrap input{padding:8px 10px;font-size:13px;border-radius:8px}
+.bcat-bal{min-width:54px;text-align:right;font-size:13px;font-weight:700}
+.bcat-week{font-size:11px;color:#7ab8c8;margin-top:2px}
+
+/* Bank */
+.bank-card{background:#1a1a24;border:1px solid #2a2a3a;border-radius:14px;margin-bottom:10px;overflow:hidden}
+.bank-hdr{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#161620}
+.bank-name{font-size:14px;font-weight:700;color:#c8b97a}
+.bank-bal{font-size:16px;font-weight:800}
+.bank-init{padding:8px 16px;border-bottom:1px solid #1e1e1e;display:flex;align-items:center;gap:8px}
+.bank-init label{font-size:11px;color:#555;white-space:nowrap}
+.bank-init input{padding:7px 10px;font-size:13px;border-radius:8px}
+.tx-row{display:flex;align-items:center;padding:11px 16px;border-bottom:1px solid #1e1e1e;gap:8px}
+.tx-row:last-child{border-bottom:none}
+.tx-date{font-size:11px;color:#555;min-width:55px}
+.tx-desc{flex:1;font-size:14px}
+.tx-amt{font-size:14px;font-weight:700}
+.tx-del{background:none;border:none;color:#3a3a3a;font-size:18px;padding:0}
+
+/* Invest */
+.inv-card{background:#1a1a24;border:1px solid #2a2a3a;border-radius:14px;padding:14px 16px;margin-bottom:10px}
+.inv-name{font-size:15px;font-weight:700;margin-bottom:4px}
+.inv-meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.inv-badge{background:#c8b97a18;color:#c8b97a;font-size:11px;padding:2px 8px;border-radius:5px}
+.inv-detail{font-size:12px;color:#666}
+.inv-amt{font-size:16px;font-weight:800;color:#e8e4dc}
+.inv-mv{font-size:12px;color:#50c878;margin-top:2px}
+.inv-top{display:flex;justify-content:space-between;align-items:flex-start}
+
+/* Colors */
+.green{color:#50c878}.red{color:#e05050}.gold{color:#c8b97a}.blue{color:#7ab8c8}.dim{color:#333}
+
+/* Toast */
+#toast{position:fixed;bottom:calc(70px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:#c8b97a;color:#0f0f13;padding:10px 22px;border-radius:20px;font-weight:700;font-size:14px;z-index:9999;display:none;white-space:nowrap;box-shadow:0 4px 20px #0008}
+@keyframes fadeUp{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* Modal sheet */
+#sheet-overlay{position:fixed;inset:0;background:#0008;z-index:200;display:none;align-items:flex-end}
+#sheet-overlay.open{display:flex}
+#sheet{background:#1a1a24;border-radius:20px 20px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));width:100%;max-height:85vh;overflow-y:auto}
+#sheet-title{font-size:16px;font-weight:800;color:#c8b97a;margin-bottom:16px}
+#sheet .qfield{margin-bottom:12px}
+#sheet .qlabel{font-size:12px;color:#666;margin-bottom:5px}
+.sheet-row{display:flex;gap:8px}
+.sheet-row .qfield{flex:1}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div id="header-row">
+      <span id="logo">家庭帳本</span>
+      <div class="hdr-right">
+        <button class="hdr-btn" onclick="exportBackup()">📦 備份</button>
+      </div>
+    </div>
+    <div id="week-label"></div>
+  </div>
+
+  <div id="content">
+    <!-- 每日記帳 -->
+    <div id="page-daily" class="page active">
+      <div id="daily-summary" class="sc-row"></div>
+      <div id="method-summary" class="method-row"></div>
+      <div id="day-cards"></div>
+    </div>
+
+    <!-- 預算表 -->
+    <div id="page-budget" class="page">
+      <div id="budget-summary" class="sc-row"></div>
+      <div id="budget-list"></div>
+      <div style="font-size:11px;color:#444;padding:4px 0 16px">週餘額 = 本月預算 ÷ 4.33 − 本週實際</div>
+    </div>
+
+    <!-- 銀行對帳 -->
+    <div id="page-bank" class="page">
+      <div id="bank-cards"></div>
+    </div>
+
+    <!-- 投資紀錄 -->
+    <div id="page-invest" class="page">
+      <div id="invest-summary" class="sc-row"></div>
+      <div id="invest-list"></div>
+    </div>
+  </div>
+
+  <!-- Bottom nav -->
+  <div id="nav">
+    <button class="nav-btn active" onclick="switchTab('daily')"><span class="icon">📅</span>每日記帳</button>
+    <button class="nav-btn" onclick="switchTab('budget')"><span class="icon">📊</span>預算表</button>
+    <button class="nav-btn" onclick="switchTab('bank')"><span class="icon">🏦</span>銀行對帳</button>
+    <button class="nav-btn" onclick="switchTab('invest')"><span class="icon">📈</span>投資</button>
+  </div>
+</div>
+
+<!-- FAB sheet for adding entries -->
+<div id="sheet-overlay" onclick="closeSheet(event)">
+  <div id="sheet">
+    <div id="sheet-title">＋ 新增記錄</div>
+    <div id="sheet-body"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const PAYMENT_METHODS = ["現金","PAY","台新","富邦","WeMo","玉山","公司帳"];
+const BUDGET_CATEGORIES = ["伙食","中餐/外食","手搖/飲料","服裝","日用品","娛樂","OT加班","交通","油費","文具/書","健康/醫療","加油","丁費","旅遊","保險","水電","定期支出","投資","貸款"];
+const DAYS = ["一","二","三","四","五","六","日"];
+const BANK_ACCOUNTS = ["台新","富邦","玉山","公司帳"];
+const INVESTMENT_TYPES = ["股票","ETF","基金","定存","其他"];
+
+function getWeekDates(){const t=new Date(),d=t.getDay(),m=new Date(t);m.setDate(t.getDate()-(d===0?6:d-1));return Array.from({length:7},(_,i)=>{const x=new Date(m);x.setDate(m.getDate()+i);return`${x.getMonth()+1}/${x.getDate()}`});}
+function getWeekKey(){const t=new Date(),d=t.getDay(),m=new Date(t);m.setDate(t.getDate()-(d===0?6:d-1));return`${m.getFullYear()}-${m.getMonth()+1}-${m.getDate()}`;}
+function getTodayIdx(){return(new Date().getDay()+6)%7;}
+function genId(){return Math.random().toString(36).slice(2,9);}
+function load(k,fb){try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb;}catch{return fb;}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+
+const WEEK_KEY=getWeekKey();
+const WEEK_DATES=getWeekDates();
+const TODAY_IDX=getTodayIdx();
+
+let budget=(()=>{const s=load("budget",{});const d=Object.fromEntries(BUDGET_CATEGORIES.map(k=>[k,{thisMonth:"",lastMonth:"",note:""}]));BUDGET_CATEGORIES.forEach(k=>{if(s[k])d[k]=s[k];});return d;})();
+let weeklyData=(()=>{const s=load(`daily_${WEEK_KEY}`,null);if(s)return s;return Array.from({length:7},(_,i)=>({date:WEEK_DATES[i],day:DAYS[i],entries:[]}));})();
+let bankData=load("bankData",BANK_ACCOUNTS.map(name=>({name,balance:"",transactions:[]})));
+let investments=load("investments",[]);
+
+const saveBudget=()=>save("budget",budget);
+const saveDaily=()=>save(`daily_${WEEK_KEY}`,weeklyData);
+const saveBank=()=>save("bankData",bankData);
+const saveInv=()=>save("investments",investments);
+
+// Week label
+document.getElementById("week-label").textContent=`本週：${WEEK_DATES[0]}（一）～ ${WEEK_DATES[6]}（日）`;
+
+// Toast
+let toastTimer;
+function showToast(msg){const t=document.getElementById("toast");t.textContent="✓ "+msg;t.style.display="block";t.style.animation="fadeUp .3s";clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.display="none",2000);}
+
+// Tab
+let currentTab="daily";
+function switchTab(id){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));
+  document.getElementById("page-"+id).classList.add("active");
+  const idx=["daily","budget","bank","invest"].indexOf(id);
+  document.querySelectorAll(".nav-btn")[idx].classList.add("active");
+  currentTab=id;
+  render();
+}
+
+// Sheet
+function openSheet(bodyHTML, title){
+  document.getElementById("sheet-title").textContent=title||"＋ 新增";
+  document.getElementById("sheet-body").innerHTML=bodyHTML;
+  document.getElementById("sheet-overlay").classList.add("open");
+}
+function closeSheet(e){if(e.target===document.getElementById("sheet-overlay"))document.getElementById("sheet-overlay").classList.remove("open");}
+function closeSheetDirect(){document.getElementById("sheet-overlay").classList.remove("open");}
+
+// Computed
+function dayTotal(d){return d.entries.reduce((s,e)=>s+e.amount,0);}
+function methodTotal(m){return weeklyData.reduce((s,d)=>s+d.entries.filter(e=>e.method===m).reduce((a,e)=>a+e.amount,0),0);}
+function weekTotal(){return weeklyData.reduce((s,d)=>s+dayTotal(d),0);}
+function weeklyByCategory(cat){return weeklyData.reduce((s,d)=>s+d.entries.filter(e=>e.category===cat).reduce((a,e)=>a+e.amount,0),0);}
+function bankBalance(b){return b.transactions.reduce((s,t)=>s+(t.type==="收入"?t.amount:-t.amount),parseFloat(b.balance)||0);}
+function totalInvested(){return investments.reduce((s,i)=>s+(parseFloat(i.amount)||0),0);}
+
+// Actions
+function addEntry(){
+  const dayIdx=parseInt(document.getElementById("s-day").value);
+  const desc=document.getElementById("s-desc").value.trim();
+  const amt=parseFloat(document.getElementById("s-amt").value);
+  const method=document.getElementById("s-method").value;
+  const cat=document.getElementById("s-cat").value;
+  if(!desc||!amt)return;
+  weeklyData[dayIdx].entries.push({id:genId(),desc,amount:amt,method,category:cat});
+  saveDaily();
+  document.getElementById("s-desc").value="";
+  document.getElementById("s-amt").value="";
+  document.getElementById("s-desc").focus();
+  showToast("已新增");
+  renderDaily();
+}
+
+function removeEntry(dayIdx,id){
+  weeklyData[dayIdx].entries=weeklyData[dayIdx].entries.filter(e=>e.id!==id);
+  saveDaily();renderDaily();
+}
+
+function addTx(){
+  const bi=parseInt(document.getElementById("s-tbank").value);
+  const desc=document.getElementById("s-tdesc").value.trim();
+  const amt=parseFloat(document.getElementById("s-tamt").value);
+  const type=document.getElementById("s-ttype").value;
+  if(!desc||!amt)return;
+  bankData[bi].transactions.push({id:genId(),desc,amount:amt,type,date:new Date().toLocaleDateString("zh-TW")});
+  saveBank();
+  closeSheetDirect();
+  showToast("已新增交易");
+  renderBank();
+}
+
+function removeTx(bi,id){bankData[bi].transactions=bankData[bi].transactions.filter(t=>t.id!==id);saveBank();renderBank();}
+
+function addInv(){
+  const name=document.getElementById("s-iname").value.trim();
+  const type=document.getElementById("s-itype").value;
+  const amt=parseFloat(document.getElementById("s-iamt").value);
+  const shares=document.getElementById("s-ishares").value;
+  const price=document.getElementById("s-iprice").value;
+  const note=document.getElementById("s-inote").value;
+  if(!name||!amt)return;
+  investments.push({id:genId(),name,type,amount:amt,shares,price,note,date:new Date().toLocaleDateString("zh-TW")});
+  saveInv();
+  closeSheetDirect();
+  showToast("已新增投資");
+  renderInvest();
+}
+
+function removeInv(id){investments=investments.filter(i=>i.id!==id);saveInv();renderInvest();}
+
+function updateBankBalance(i,v){bankData[i].balance=v;saveBank();renderBank();}
+function updateBudget(cat,field,val){budget[cat][field]=val;saveBudget();renderBudget();}
+
+function exportBackup(){
+  const data={budget,investments,bankData,weekKey:WEEK_KEY,weeklyData,exportedAt:new Date().toISOString()};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download=`家庭帳本備份_${new Date().toLocaleDateString("zh-TW").replace(/\//g,"-")}.json`;
+  a.click();showToast("備份已下載");
+}
+
+function selectOptions(arr,selected=""){return arr.map(v=>`<option value="${v}"${v==selected?"selected":""}>${v}</option>`).join("");}
+
+// Open sheets
+function openDailySheet(){
+  const dayOpts=WEEK_DATES.map((d,i)=>`<option value="${i}"${i===TODAY_IDX?"selected":""}>${d}（${DAYS[i]}）</option>`).join("");
+  openSheet(`
+    <div class="qfield"><div class="qlabel">日期</div><select id="s-day">${dayOpts}</select></div>
+    <div class="qfield"><div class="qlabel">說明</div><input type="text" id="s-desc" placeholder="午餐、超市..."></div>
+    <div class="sheet-row">
+      <div class="qfield"><div class="qlabel">金額</div><input type="number" id="s-amt" placeholder="0" inputmode="decimal"></div>
+      <div class="qfield"><div class="qlabel">付款方式</div><select id="s-method">${selectOptions(PAYMENT_METHODS)}</select></div>
+    </div>
+    <div class="qfield"><div class="qlabel">類別</div><select id="s-cat">${selectOptions(BUDGET_CATEGORIES)}</select></div>
+    <button class="btn-add" onclick="addEntry()">新增</button>
+  `,"＋ 新增記錄");
+  setTimeout(()=>document.getElementById("s-desc").focus(),300);
+}
+
+function openTxSheet(){
+  const bankOpts=BANK_ACCOUNTS.map((b,i)=>`<option value="${i}">${b}</option>`).join("");
+  openSheet(`
+    <div class="sheet-row">
+      <div class="qfield"><div class="qlabel">銀行</div><select id="s-tbank">${bankOpts}</select></div>
+      <div class="qfield"><div class="qlabel">類型</div><select id="s-ttype"><option>支出</option><option>收入</option></select></div>
+    </div>
+    <div class="qfield"><div class="qlabel">說明</div><input type="text" id="s-tdesc" placeholder="說明"></div>
+    <div class="qfield"><div class="qlabel">金額</div><input type="number" id="s-tamt" placeholder="0" inputmode="decimal"></div>
+    <button class="btn-add" onclick="addTx()">新增</button>
+  `,"＋ 新增交易");
+}
+
+function openInvSheet(){
+  openSheet(`
+    <div class="qfield"><div class="qlabel">名稱</div><input type="text" id="s-iname" placeholder="台積電、00878..."></div>
+    <div class="sheet-row">
+      <div class="qfield"><div class="qlabel">類型</div><select id="s-itype">${selectOptions(INVESTMENT_TYPES)}</select></div>
+      <div class="qfield"><div class="qlabel">投入金額</div><input type="number" id="s-iamt" placeholder="0" inputmode="decimal"></div>
+    </div>
+    <div class="sheet-row">
+      <div class="qfield"><div class="qlabel">股數</div><input type="number" id="s-ishares" placeholder="0"></div>
+      <div class="qfield"><div class="qlabel">成本價</div><input type="number" id="s-iprice" placeholder="0"></div>
+    </div>
+    <div class="qfield"><div class="qlabel">備註</div><input type="text" id="s-inote" placeholder="備註"></div>
+    <button class="btn-add" onclick="addInv()">新增</button>
+  `,"＋ 新增投資");
+}
+
+// Render
+function renderDaily(){
+  const wt=weekTotal();
+  // Summary
+  const bar=document.getElementById("daily-summary");bar.innerHTML="";
+  const sc0=document.createElement("div");sc0.className="sc gold";
+  sc0.innerHTML=`<div class="sc-label">本週總支出</div><div class="sc-val">NT$${wt.toLocaleString()}</div>`;
+  bar.appendChild(sc0);
+  PAYMENT_METHODS.forEach(m=>{const t=methodTotal(m);if(t>0){const sc=document.createElement("div");sc.className="sc";sc.innerHTML=`<div class="sc-label">${m}</div><div class="sc-val-sm">${t.toLocaleString()}</div>`;bar.appendChild(sc);}});
+
+  // Method chips (non-zero)
+  const mr=document.getElementById("method-summary");mr.innerHTML="";
+
+  // Day cards
+  const dc=document.getElementById("day-cards");dc.innerHTML="";
+
+  // Add button card
+  const addCard=document.createElement("div");
+  addCard.className="qcard";
+  addCard.innerHTML=`<button class="btn-add" onclick="openDailySheet()" style="margin-top:0">＋ 新增今日記錄</button>`;
+  dc.appendChild(addCard);
+
+  weeklyData.forEach((day,dayIdx)=>{
+    const total=dayTotal(day);
+    const isToday=dayIdx===TODAY_IDX;
+    const card=document.createElement("div");card.className="day-card";
+    const hdr=document.createElement("div");hdr.className="day-header";
+    hdr.innerHTML=`<div class="day-label${isToday?" today":""}">${day.date}（${day.day}）${isToday?" · 今天":""}</div><div class="day-total${total===0?" zero":""}">${total>0?"NT$"+total.toLocaleString():"—"}</div>`;
+    card.appendChild(hdr);
+    if(day.entries.length===0){
+      const ne=document.createElement("div");ne.className="no-entries";ne.textContent="尚無記錄";card.appendChild(ne);
+    } else {
+      const list=document.createElement("div");list.className="entries-list";
+      day.entries.forEach(e=>{
+        const row=document.createElement("div");row.className="entry-row";
+        row.innerHTML=`<span class="entry-cat">${e.category}</span><span class="entry-desc">${e.desc}</span><span class="entry-method">${e.method}</span><span class="entry-amt">$${e.amount.toLocaleString()}</span>`;
+        const btn=document.createElement("button");btn.className="entry-del";btn.textContent="×";btn.onclick=()=>removeEntry(dayIdx,e.id);
+        row.appendChild(btn);list.appendChild(row);
+      });
+      card.appendChild(list);
+    }
+    dc.appendChild(card);
+  });
+}
+
+function renderBudget(){
+  const wt=weekTotal();
+  const totalBudget=BUDGET_CATEGORIES.reduce((s,k)=>s+(parseFloat(budget[k].thisMonth)||0),0);
+  const bar=document.getElementById("budget-summary");bar.innerHTML="";
+  bar.appendChild(Object.assign(document.createElement("div"),{className:"sc gold",innerHTML:`<div class="sc-label">本月預算</div><div class="sc-val">NT$${totalBudget.toLocaleString()}</div>`}));
+  bar.appendChild(Object.assign(document.createElement("div"),{className:"sc",innerHTML:`<div class="sc-label">本週實際</div><div class="sc-val-sm blue">NT$${wt.toLocaleString()}</div>`}));
+  const weekBal=Math.round((totalBudget/4.33)-wt);
+  const sc3=document.createElement("div");sc3.className="sc";
+  sc3.innerHTML=`<div class="sc-label">週餘額</div><div class="sc-val-sm ${weekBal>=0?"green":"red"}">${weekBal>=0?"+":""}${weekBal.toLocaleString()}</div>`;
+  bar.appendChild(sc3);
+
+  const list=document.getElementById("budget-list");list.innerHTML="";
+  BUDGET_CATEGORIES.forEach(cat=>{
+    const b=parseFloat(budget[cat].thisMonth)||0;
+    const wAmt=weeklyByCategory(cat);
+    const wBal=Math.round((b/4.33)-wAmt);
+    const hasData=b>0||wAmt>0;
+    const row=document.createElement("div");row.className="bcat-row";
+    const nameDiv=document.createElement("div");nameDiv.className="bcat-name";nameDiv.textContent=cat;
+    const inputsDiv=document.createElement("div");inputsDiv.className="bcat-inputs";
+    inputsDiv.innerHTML=`
+      <div class="bcat-input-row">
+        <div class="bcat-input-wrap"><label>本月預算</label><input type="number" value="${budget[cat].thisMonth}" placeholder="0" inputmode="decimal" oninput="updateBudget('${cat}','thisMonth',this.value)"></div>
+        <div class="bcat-input-wrap"><label>上個月</label><input type="number" value="${budget[cat].lastMonth}" placeholder="0" inputmode="decimal" oninput="updateBudget('${cat}','lastMonth',this.value)"></div>
+      </div>
+      <div class="bcat-input-row">
+        <div class="bcat-input-wrap"><label>備註</label><input type="text" value="${budget[cat].note}" placeholder="備註" oninput="updateBudget('${cat}','note',this.value)"></div>
+      </div>
+    `;
+    const balDiv=document.createElement("div");balDiv.className="bcat-bal";
+    if(!hasData)balDiv.innerHTML=`<span class="dim">—</span>`;
+    else if(b===0)balDiv.innerHTML=`<span class="red" style="font-size:11px">無預算</span>`;
+    else balDiv.innerHTML=`<span class="${wBal>=0?"green":"red"}">${wBal>=0?"+":""}${wBal.toLocaleString()}</span><div class="bcat-week">${wAmt>0?wAmt.toLocaleString():"0"}</div>`;
+    row.appendChild(nameDiv);row.appendChild(inputsDiv);row.appendChild(balDiv);
+    list.appendChild(row);
+  });
+}
+
+function renderBank(){
+  const wrap=document.getElementById("bank-cards");wrap.innerHTML="";
+
+  // Add button
+  const addDiv=document.createElement("div");addDiv.style.marginBottom="12px";
+  addDiv.innerHTML=`<button class="btn-add" onclick="openTxSheet()" style="border-radius:12px">＋ 新增交易</button>`;
+  wrap.appendChild(addDiv);
+
+  bankData.forEach((bank,bi)=>{
+    const bal=bankBalance(bank);
+    const card=document.createElement("div");card.className="bank-card";
+    const hdr=document.createElement("div");hdr.className="bank-hdr";
+    hdr.innerHTML=`<div class="bank-name">${bank.name}</div><div class="bank-bal ${bal>=0?"green":"red"}">NT$${bal.toLocaleString()}</div>`;
+    card.appendChild(hdr);
+    const initRow=document.createElement("div");initRow.className="bank-init";
+    initRow.innerHTML=`<label>初始餘額</label>`;
+    const inp=document.createElement("input");inp.type="number";inp.value=bank.balance;inp.placeholder="0";inp.style.flex="1";inp.oninput=e=>updateBankBalance(bi,e.target.value);
+    initRow.appendChild(inp);card.appendChild(initRow);
+    if(bank.transactions.length===0){
+      const em=document.createElement("div");em.className="no-entries";em.textContent="尚無交易";card.appendChild(em);
+    } else {
+      bank.transactions.forEach(tx=>{
+        const row=document.createElement("div");row.className="tx-row";
+        row.innerHTML=`<span class="tx-date">${tx.date}</span><span class="tx-desc">${tx.desc}</span><span class="tx-amt ${tx.type==="收入"?"green":"red"}">${tx.type==="收入"?"+":"-"}${tx.amount.toLocaleString()}</span>`;
+        const btn=document.createElement("button");btn.className="tx-del";btn.textContent="×";btn.onclick=()=>removeTx(bi,tx.id);
+        row.appendChild(btn);card.appendChild(row);
+      });
+    }
+    wrap.appendChild(card);
+  });
+}
+
+function renderInvest(){
+  const ti=totalInvested();
+  const bar=document.getElementById("invest-summary");bar.innerHTML="";
+  bar.appendChild(Object.assign(document.createElement("div"),{className:"sc gold",innerHTML:`<div class="sc-label">投資總計</div><div class="sc-val">NT$${ti.toLocaleString()}</div>`}));
+  INVESTMENT_TYPES.forEach(t=>{
+    const total=investments.filter(i=>i.type===t).reduce((s,i)=>s+(parseFloat(i.amount)||0),0);
+    if(total>0)bar.appendChild(Object.assign(document.createElement("div"),{className:"sc",innerHTML:`<div class="sc-label">${t}</div><div class="sc-val-sm">${total.toLocaleString()}</div>`}));
+  });
+
+  const list=document.getElementById("invest-list");list.innerHTML="";
+  const addDiv=document.createElement("div");addDiv.style.marginBottom="12px";
+  addDiv.innerHTML=`<button class="btn-add" onclick="openInvSheet()" style="border-radius:12px">＋ 新增投資</button>`;
+  list.appendChild(addDiv);
+
+  if(investments.length===0){
+    const em=document.createElement("div");em.style.cssText="color:#333;text-align:center;padding:30px;font-size:14px";em.textContent="尚無投資紀錄";list.appendChild(em);return;
+  }
+  investments.forEach(inv=>{
+    const mv=(parseFloat(inv.shares)||0)*(parseFloat(inv.price)||0);
+    const card=document.createElement("div");card.className="inv-card";
+    const top=document.createElement("div");top.className="inv-top";
+    const left=document.createElement("div");
+    left.innerHTML=`<div class="inv-name">${inv.name}</div><div class="inv-meta"><span class="inv-badge">${inv.type}</span>${inv.shares?`<span class="inv-detail">${inv.shares}股 @ ${inv.price}</span>`:""}${inv.note?`<span class="inv-detail">${inv.note}</span>`:""}</div>`;
+    const right=document.createElement("div");right.style.textAlign="right";
+    right.innerHTML=`<div class="inv-amt">$${(parseFloat(inv.amount)||0).toLocaleString()}</div>${mv>0?`<div class="inv-mv">市值 ${mv.toLocaleString()}</div>`:""}`;
+    const del=document.createElement("div");
+    const btn=document.createElement("button");btn.className="tx-del";btn.textContent="×";btn.onclick=()=>removeInv(inv.id);
+    top.appendChild(left);top.appendChild(right);
+    card.appendChild(top);card.appendChild(btn);
+    // Fix: put delete in corner
+    card.style.position="relative";
+    btn.style.cssText="position:absolute;top:12px;right:12px;background:none;border:none;color:#3a3a3a;font-size:20px;padding:0";
+    card.appendChild(btn);
+    list.appendChild(card);
+  });
+}
+
+function render(){renderDaily();renderBudget();renderBank();renderInvest();}
+render();
+</script>
+</body>
+</html>
