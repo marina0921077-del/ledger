@@ -820,11 +820,80 @@ function renderInvest(){
   });
 }
 
+// ── URL Import ──
+// Handles links like: https://...ledger?add=ENCODED_JSON
+// ENCODED_JSON is base64url of [{desc,amount,method,category,date}]
+function handleURLImport(){
+  try{
+    const params=new URLSearchParams(window.location.search);
+    const raw=params.get("add");
+    if(!raw)return;
+    const json=atob(raw.replace(/-/g,"+").replace(/_/g,"/"));
+    const items=JSON.parse(json);
+    if(!items||!items.length)return;
+
+    // Clear URL param without reload
+    const url=new URL(window.location.href);
+    url.searchParams.delete("add");
+    window.history.replaceState({},"",url.toString());
+
+    // Show confirmation sheet
+    const weeks=getMonthWeeks(curYear,curMonth);
+    const week=weeks[weekOffset]||weeks[0];
+    const {data}=getWeeklyData(week.dates);
+    const dayOpts=data.map((d,i)=>`<option value="${i}">${d.date}（${d.day}）</option>`).join("");
+
+    let html=`<div style="font-size:12px;color:#c8b97a;font-weight:700;margin-bottom:10px">✦ 辨識到 ${items.length} 筆，確認後新增</div><div class="ai-result">`;
+    items.forEach((item,i)=>{
+      // auto-match day
+      let defDay=0;
+      if(item.date){
+        const[m,dd]=(item.date+"").split("/").map(Number);
+        data.forEach((d,di)=>{const p=d.fullDate.split("-");if(+p[1]===m&&+p[2]===dd)defDay=di;});
+      }
+      const dayOptsWithDef=data.map((d,di)=>`<option value="${di}"${di===defDay?"selected":""}>${d.date}（${d.day}）</option>`).join("");
+      html+=`<div class="ai-item">
+        <input type="checkbox" class="ai-cb" id="ui-cb-${i}" checked>
+        <div class="ai-info">
+          <div class="ai-desc">${item.desc}</div>
+          <div class="ai-meta">${item.category} · ${item.method}
+            <select id="ui-day-${i}" style="display:inline-block;width:auto;padding:2px 6px;font-size:11px;border-radius:6px;margin-left:6px">${dayOptsWithDef}</select>
+          </div>
+        </div>
+        <div class="ai-amt">$${item.amount}</div>
+      </div>`;
+    });
+    html+=`</div><button class="btn-gold" onclick="confirmURLImport(${JSON.stringify(items).replace(/"/g,'&quot;')})">✓ 新增到帳本</button>`;
+
+    openSheet("📋 匯入記錄",html);
+  }catch(e){console.log("URL import error",e);}
+}
+
+function confirmURLImport(items){
+  const weeks=getMonthWeeks(curYear,curMonth);
+  const week=weeks[weekOffset]||weeks[0];
+  const{key,data}=getWeeklyData(week.dates);
+  let count=0;
+  items.forEach((item,i)=>{
+    const cb=document.getElementById(`ui-cb-${i}`);
+    if(cb&&cb.checked){
+      const daySel=document.getElementById(`ui-day-${i}`);
+      const dayIdx=daySel?parseInt(daySel.value):0;
+      data[dayIdx].entries.push({id:genId(),desc:item.desc,amount:item.amount,method:item.method,category:item.category});
+      count++;
+    }
+  });
+  save(key,data);
+  closeSheetDirect();
+  showToast(`已新增 ${count} 筆`);
+  renderDaily();
+}
+
 // ── Init ──
-// Set weekOffset to current week of current month
 weekOffset=getCurrentWeekIdx(curYear,curMonth);
 updateYMLabel();
 renderDaily();
+handleURLImport();
 </script>
 </body>
 </html>
