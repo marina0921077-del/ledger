@@ -717,9 +717,11 @@ function renderDaily(){
     }else{
       const list=document.createElement("div");list.className="entries";
       day.entries.forEach(e=>{
-        const row=document.createElement("div");row.className="entry-row";
+        const row=document.createElement("div");row.className="entry-row";row.style.cursor="pointer";
         row.innerHTML=`<span class="ecat">${e.category}</span><span class="edesc">${e.desc}</span><span class="emethod">${e.method}</span><span class="eamt">$${e.amount.toLocaleString()}</span>`;
-        const btn=document.createElement("button");btn.className="btn-icon-sm";btn.textContent="×";btn.onclick=()=>removeEntry(key,data,dayIdx,e.id);
+        row.onclick=()=>openEditSheet(key,data,dayIdx,e.id);
+        const btn=document.createElement("button");btn.className="btn-icon-sm";btn.textContent="×";
+        btn.onclick=(ev)=>{ev.stopPropagation();removeEntry(key,data,dayIdx,e.id);};
         row.appendChild(btn);list.appendChild(row);
       });
       card.appendChild(list);
@@ -821,84 +823,131 @@ function renderInvest(){
 }
 
 // ── URL Import ──
-// Handles links like: https://...ledger?add=ENCODED_JSON
-// ENCODED_JSON is base64url of [{desc,amount,method,category,date}]
+let _importItems=[];
 function handleURLImport(){
   try{
     const params=new URLSearchParams(window.location.search);
     const raw=params.get("add");
     if(!raw)return;
-    const json=decodeURIComponent(raw);
-    const items=JSON.parse(json);
+    const items=JSON.parse(decodeURIComponent(raw));
     if(!items||!items.length)return;
-
-    // Clear URL param without reload
-    const url=new URL(window.location.href);
-    url.searchParams.delete("add");
-    window.history.replaceState({},"",url.toString());
-
-    // Auto-navigate to the week containing the first item's date
+    const u=new URL(window.location.href);
+    u.searchParams.delete("add");
+    window.history.replaceState({},"",u.toString());
     if(items[0]&&items[0].date){
-      const[m,dd]=items[0].date.split("/").map(Number);
+      const parts=items[0].date.split("/");
+      const m=parseInt(parts[0]),dd=parseInt(parts[1]);
       const weeks=getMonthWeeks(curYear,curMonth);
       for(let wi=0;wi<weeks.length;wi++){
-        if(weeks[wi].dates.some(d=>d.getMonth()+1===m&&d.getDate()===dd)){
-          weekOffset=wi; break;
-        }
+        if(weeks[wi].dates.some(d=>d.getMonth()+1===m&&d.getDate()===dd)){weekOffset=wi;break;}
       }
       renderDaily();
     }
-
-    // Show confirmation sheet
-    const weeks=getMonthWeeks(curYear,curMonth);
-    const week=weeks[weekOffset]||weeks[0];
-    const {data}=getWeeklyData(week.dates);
-    const dayOpts=data.map((d,i)=>`<option value="${i}">${d.date}（${d.day}）</option>`).join("");
-
-    let html=`<div style="font-size:12px;color:#c8b97a;font-weight:700;margin-bottom:10px">✦ 辨識到 ${items.length} 筆，確認後新增</div><div class="ai-result">`;
-    items.forEach((item,i)=>{
-      // auto-match day
-      let defDay=0;
-      if(item.date){
-        const[m,dd]=(item.date+"").split("/").map(Number);
-        data.forEach((d,di)=>{const p=d.fullDate.split("-");if(+p[1]===m&&+p[2]===dd)defDay=di;});
-      }
-      const dayOptsWithDef=data.map((d,di)=>`<option value="${di}"${di===defDay?"selected":""}>${d.date}（${d.day}）</option>`).join("");
-      html+=`<div class="ai-item">
-        <input type="checkbox" class="ai-cb" id="ui-cb-${i}" checked>
-        <div class="ai-info">
-          <div class="ai-desc">${item.desc}</div>
-          <div class="ai-meta">${item.category} · ${item.method}
-            <select id="ui-day-${i}" style="display:inline-block;width:auto;padding:2px 6px;font-size:11px;border-radius:6px;margin-left:6px">${dayOptsWithDef}</select>
-          </div>
-        </div>
-        <div class="ai-amt">$${item.amount}</div>
-      </div>`;
-    });
-    html+=`</div><button class="btn-gold" onclick="confirmURLImport(${JSON.stringify(items).replace(/"/g,'&quot;')})">✓ 新增到帳本</button>`;
-
-    openSheet("📋 匯入記錄",html);
-  }catch(e){console.log("URL import error",e);}
+    _importItems=items;
+    showImportSheet();
+  }catch(e){console.error("URL import error",e);}
 }
 
-function confirmURLImport(items){
+function showImportSheet(){
+  const items=_importItems;
+  const weeks=getMonthWeeks(curYear,curMonth);
+  const week=weeks[weekOffset]||weeks[0];
+  const{data}=getWeeklyData(week.dates);
+  const wrap=document.createElement("div");
+  const hdr=document.createElement("div");
+  hdr.style.cssText="font-size:12px;color:#c8b97a;font-weight:700;margin-bottom:10px";
+  hdr.textContent="✦ 辨識到 "+items.length+" 筆，確認後新增";
+  wrap.appendChild(hdr);
+  const lst=document.createElement("div");lst.className="ai-result";
+  items.forEach(function(item,i){
+    let defDay=0;
+    if(item.date){
+      const parts=item.date.split("/");
+      const m=parseInt(parts[0]),dd=parseInt(parts[1]);
+      data.forEach(function(d,di){const p=d.fullDate.split("-");if(parseInt(p[1])===m&&parseInt(p[2])===dd)defDay=di;});
+    }
+    const row=document.createElement("div");row.className="ai-item";
+    const cb=document.createElement("input");cb.type="checkbox";cb.className="ai-cb";cb.id="ui-cb-"+i;cb.checked=true;
+    const info=document.createElement("div");info.className="ai-info";
+    const desc=document.createElement("div");desc.className="ai-desc";desc.textContent=item.desc;
+    const meta=document.createElement("div");meta.className="ai-meta";
+    const metaText=document.createTextNode(item.category+" · "+item.method+" ");
+    meta.appendChild(metaText);
+    const sel=document.createElement("select");
+    sel.id="ui-day-"+i;
+    sel.style.cssText="display:inline-block;width:auto;padding:2px 6px;font-size:11px;border-radius:6px;margin-left:4px";
+    data.forEach(function(d,di){const opt=document.createElement("option");opt.value=di;opt.textContent=d.date+"（"+d.day+"）";if(di===defDay)opt.selected=true;sel.appendChild(opt);});
+    meta.appendChild(sel);
+    info.appendChild(desc);info.appendChild(meta);
+    const amt=document.createElement("div");amt.className="ai-amt";amt.textContent="$"+item.amount;
+    row.appendChild(cb);row.appendChild(info);row.appendChild(amt);
+    lst.appendChild(row);
+  });
+  wrap.appendChild(lst);
+  const btn=document.createElement("button");btn.className="btn-gold";btn.style.marginTop="10px";btn.textContent="✓ 新增到帳本";btn.onclick=confirmURLImport;
+  wrap.appendChild(btn);
+  document.getElementById("sheet-title").textContent="📋 匯入記錄";
+  const body=document.getElementById("sheet-body");body.innerHTML="";body.appendChild(wrap);
+  document.getElementById("sheet-overlay").classList.add("open");
+}
+
+function confirmURLImport(){
+  const items=_importItems;
   const weeks=getMonthWeeks(curYear,curMonth);
   const week=weeks[weekOffset]||weeks[0];
   const{key,data}=getWeeklyData(week.dates);
   let count=0;
-  items.forEach((item,i)=>{
-    const cb=document.getElementById(`ui-cb-${i}`);
+  items.forEach(function(item,i){
+    const cb=document.getElementById("ui-cb-"+i);
     if(cb&&cb.checked){
-      const daySel=document.getElementById(`ui-day-${i}`);
-      const dayIdx=daySel?parseInt(daySel.value):0;
+      const sel=document.getElementById("ui-day-"+i);
+      const dayIdx=sel?parseInt(sel.value):0;
       data[dayIdx].entries.push({id:genId(),desc:item.desc,amount:item.amount,method:item.method,category:item.category});
       count++;
     }
   });
-  save(key,data);
-  closeSheetDirect();
-  showToast(`已新增 ${count} 筆`);
-  renderDaily();
+  save(key,data);closeSheetDirect();showToast("已新增 "+count+" 筆");renderDaily();
+}
+
+// ── Edit entry ──
+function openEditSheet(key,data,dayIdx,entryId){
+  const entry=data[dayIdx].entries.find(function(e){return e.id===entryId;});
+  if(!entry)return;
+  const dayOpts=data.map(function(d,i){return'<option value="'+i+'"'+(i===dayIdx?' selected':'')+'>'+d.date+'（'+d.day+'）</option>';}).join('');
+  const catOpts=BUDGET_CATEGORIES.map(function(c){return'<option value="'+c+'"'+(c===entry.category?' selected':'')+'>'+c+'</option>';}).join('');
+  const methodOpts=PAYMENT_METHODS.map(function(m){return'<option value="'+m+'"'+(m===entry.method?' selected':'')+'>'+m+'</option>';}).join('');
+  openSheet("✏️ 編輯記錄",
+    '<div class="qfield"><div class="qlabel">日期</div><select id="ed-day">'+dayOpts+'</select></div>'+
+    '<div class="qfield"><div class="qlabel">說明</div><input type="text" id="ed-desc" value=""></div>'+
+    '<div class="sheet-row"><div class="qfield"><div class="qlabel">金額</div><input type="number" id="ed-amt" value="'+entry.amount+'" inputmode="decimal"></div>'+
+    '<div class="qfield"><div class="qlabel">付款方式</div><select id="ed-method">'+methodOpts+'</select></div></div>'+
+    '<div class="qfield"><div class="qlabel">類別</div><select id="ed-cat">'+catOpts+'</select></div>'+
+    '<button class="btn-gold" id="ed-save-btn" style="margin-top:4px">儲存</button>'+
+    '<button class="btn-dark" id="ed-del-btn" style="margin-top:8px;color:#e05050;border-color:#e0505033">刪除這筆</button>'
+  );
+  document.getElementById("ed-desc").value=entry.desc;
+  document.getElementById("ed-save-btn").onclick=function(){saveEdit(key,data,dayIdx,entryId);};
+  document.getElementById("ed-del-btn").onclick=function(){deleteEditEntry(key,data,dayIdx,entryId);};
+}
+
+function saveEdit(key,data,dayIdx,entryId){
+  const newDayIdx=parseInt(document.getElementById("ed-day").value);
+  const desc=document.getElementById("ed-desc").value.trim();
+  const amt=parseFloat(document.getElementById("ed-amt").value);
+  const method=document.getElementById("ed-method").value;
+  const cat=document.getElementById("ed-cat").value;
+  if(!desc||!amt)return;
+  let entry=null;
+  data.forEach(function(d){const idx=d.entries.findIndex(function(e){return e.id===entryId;});if(idx>=0){entry=d.entries.splice(idx,1)[0];}});
+  if(!entry)return;
+  entry.desc=desc;entry.amount=amt;entry.method=method;entry.category=cat;
+  data[newDayIdx].entries.push(entry);
+  save(key,data);closeSheetDirect();showToast("已更新");renderDaily();
+}
+
+function deleteEditEntry(key,data,dayIdx,entryId){
+  data[dayIdx].entries=data[dayIdx].entries.filter(function(e){return e.id!==entryId;});
+  save(key,data);closeSheetDirect();showToast("已刪除");renderDaily();
 }
 
 // ── Init ──
